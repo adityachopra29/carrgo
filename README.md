@@ -25,3 +25,8 @@ Carrgo automates the most time-consuming part of freight brokering: calling carr
 - **Compliance Filtering** — only calls carriers marked as compliant, authority active, and insurance valid
 - **Full Call Transcripts** — every call is logged with transcript and duration
 
+---
+
+## Setup
+
+See the full **[Setup Guide →](docs/SETUP.md)** for step-by-step instructions including all API keys.
