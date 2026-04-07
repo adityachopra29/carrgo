@@ -7,7 +7,19 @@ echo "===================================="
 # Start backend
 echo "[1/3] Starting backend on http://localhost:8000..."
 cd backend
-source venv/bin/activate
+
+# Locate and activate virtualenv (supports .venv/ or venv/)
+if [ -f ".venv/bin/activate" ]; then
+  source .venv/bin/activate
+elif [ -f "venv/bin/activate" ]; then
+  source venv/bin/activate
+else
+  echo "  No virtualenv found. Creating .venv and installing dependencies..."
+  python3 -m venv .venv
+  source .venv/bin/activate
+  pip install -r requirements.txt --quiet
+fi
+
 python3 seed.py 2>/dev/null
 uvicorn app.main:app --port 8000 --reload --log-level info &
 BACKEND_PID=$!
