@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.call import Call, CallStatus
 from app.models.campaign import Campaign
+from app.models.load import Load
 from app.services.events import event_manager
 
 logger = logging.getLogger(__name__)
@@ -71,12 +72,15 @@ async def _process_webhook(body: dict, db: AsyncSession):
         logger.warning(f"Received webhook for unknown call: {vapi_call_id}")
         return {"status": "ignored", "reason": "unknown call"}
 
-    # Get associated campaign and load_id
+    # Get associated campaign and load
     campaign_result = await db.execute(
         select(Campaign).where(Campaign.id == call.campaign_id)
     )
     campaign = campaign_result.scalar_one()
     load_id = campaign.load_id
+
+    load_result = await db.execute(select(Load).where(Load.id == load_id))
+    load = load_result.scalar_one()
 
     if event_type == "status-update":
         status_str = call_data.get("status", "")
@@ -117,6 +121,10 @@ async def _process_webhook(body: dict, db: AsyncSession):
             call.transcript = None
 
         await db.commit()
+
+        # Update campaign progress
+        from app.services.outreach import _handle_call_completion
+        await _handle_call_completion(db, load, campaign)
 
         await event_manager.publish_call_update(
             load_id,

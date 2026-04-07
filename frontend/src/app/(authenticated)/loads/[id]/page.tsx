@@ -15,9 +15,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { apiClient, getSSEUrl } from "@/lib/api";
 import { toast } from "sonner";
-import type { LoadDetail, Campaign, Call } from "@/types";
+import type { LoadDetail, Campaign } from "@/types";
 import { STATUS_LABELS, EQUIPMENT_LABELS, CALL_STATUS_LABELS } from "@/types";
 
 function getStatusVariant(
@@ -51,6 +57,7 @@ export default function LoadDetailPage() {
   const [loading, setLoading] = useState(true);
   const [startingOutreach, setStartingOutreach] = useState(false);
   const [bookingCallId, setBookingCallId] = useState<string | null>(null);
+  const [selectedTranscript, setSelectedTranscript] = useState<string | null>(null);
 
   const fetchLoad = useCallback(async () => {
     try {
@@ -107,6 +114,7 @@ export default function LoadDetailPage() {
                   ...prev,
                   status: data.data.status,
                   completed_calls: data.data.completed_calls,
+                  total_calls: data.data.total_calls,
                   best_rate: data.data.best_rate,
                 }
               : prev
@@ -442,8 +450,18 @@ export default function LoadDetailPage() {
                                 ? `${(diff * 100).toFixed(1)}%`
                                 : `+${(diff * 100).toFixed(1)}%`}
                             </TableCell>
-                            <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
-                              {call.transcript || "-"}
+                            <TableCell className="text-sm">
+                              {call.transcript ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setSelectedTranscript(call.transcript)}
+                                >
+                                  Show transcript
+                                </Button>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
                             </TableCell>
                             {load.status !== "booked" && (
                               <TableCell className="text-right">
@@ -471,6 +489,18 @@ export default function LoadDetailPage() {
           </Tabs>
         </>
       )}
+
+      {/* Transcript Viewer Dialog */}
+      <Dialog open={!!selectedTranscript} onOpenChange={(open) => !open && setSelectedTranscript(null)}>
+        <DialogContent className="max-w-2xl max-h-96 overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Call Transcript</DialogTitle>
+          </DialogHeader>
+          <div className="bg-muted/50 rounded-lg p-4 font-mono text-sm whitespace-pre-wrap leading-relaxed">
+            {selectedTranscript || ""}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

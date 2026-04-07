@@ -34,11 +34,11 @@ NEGOTIATION INSTRUCTIONS:
 - If their rate is between ${target_rate:.0f} and ${floor_rate:.0f}, counter-offer with ${target_rate:.0f} and try to meet in the middle
 - If their rate is above ${floor_rate:.0f}, politely say it's above your budget and thank them
 - When you have their final rate and availability, call the submit_quote function with the results
-- After calling submit_quote, thank them and end the call by saying "Thanks, goodbye!" and disconnecting
+- After calling submit_quote, say: "Great! We'll reach out if we book this load. Thanks for your time!" then end the call by saying "Goodbye!" and disconnecting
 - Keep the conversation under 2 minutes
 - If you reach voicemail, hang up immediately
 
-CRITICAL: You MUST call the submit_quote function with the carrier's response. After submit_quote succeeds, end the call."""
+CRITICAL: You MUST call the submit_quote function with the carrier's response. After submit_quote succeeds, mention the booking follow-up and end the call."""
 
 SUBMIT_QUOTE_FUNCTION = {
     "name": "submit_quote",
