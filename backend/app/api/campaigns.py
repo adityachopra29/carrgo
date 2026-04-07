@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -10,6 +11,7 @@ from app.database import get_db
 from app.models.booking import Booking
 from app.models.call import Call, CallStatus
 from app.models.campaign import Campaign
+from app.models.carrier import Carrier
 from app.models.load import Load, LoadStatus
 from app.models.user import User
 from app.schemas.booking import BookingCreate, BookingResponse
@@ -17,6 +19,7 @@ from app.schemas.call import CallResponse
 from app.schemas.campaign import CampaignResponse, OutreachRequest
 from app.schemas.carrier import CarrierResponse
 from app.services.outreach import start_outreach
+from app.services.notifications import notify_carrier_booked
 
 router = APIRouter(prefix="/loads/{load_id}", tags=["campaigns"])
 
@@ -171,5 +174,19 @@ async def book_load(
     load.status = LoadStatus.BOOKED
     await db.commit()
     await db.refresh(booking)
+
+    # Fetch carrier for notification
+    carrier_result = await db.execute(select(Carrier).where(Carrier.id == call.carrier_id))
+    carrier = carrier_result.scalar_one_or_none()
+    if carrier:
+        asyncio.create_task(
+            notify_carrier_booked(
+                carrier_phone=carrier.phone,
+                carrier_email=carrier.email,
+                carrier_name=carrier.name,
+                load=load,
+                agreed_rate=booking.agreed_rate,
+            )
+        )
 
     return booking

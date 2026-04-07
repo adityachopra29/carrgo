@@ -25,10 +25,10 @@ class Call(Base):
         String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     campaign_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("campaigns.id"), nullable=False
+        String(36), ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False
     )
     carrier_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("carriers.id"), nullable=False
+        String(36), ForeignKey("carriers.id", ondelete="CASCADE"), nullable=False
     )
     vapi_call_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[CallStatus] = mapped_column(

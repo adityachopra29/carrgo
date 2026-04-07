@@ -19,6 +19,16 @@ class Settings(BaseSettings):
     google_client_secret: str = ""
     google_redirect_uri: str = "http://localhost:3000/auth/callback"
 
+    # Twilio (SMS + WhatsApp)
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_phone_number: str = ""      # E.164, e.g. "+15551234567"
+    twilio_whatsapp_number: str = ""   # e.g. "whatsapp:+14155238886"
+
+    # Gmail SMTP
+    gmail_address: str = ""
+    gmail_app_password: str = ""       # Gmail App Password (not account password)
+
     # Vapi — get these from https://dashboard.vapi.ai
     vapi_api_key: str = ""  # Required for real calls
     vapi_base_url: str = "https://api.vapi.ai"
