@@ -3,17 +3,23 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.auth import get_current_user
 from app.database import get_db
 from app.models.call import Call
 from app.models.campaign import Campaign
 from app.models.load import Load, LoadStatus
+from app.models.user import User
 from app.schemas.load import LoadCreate, LoadDetailResponse, LoadResponse, LoadUpdate
 
 router = APIRouter(prefix="/loads", tags=["loads"])
 
 
 @router.post("", response_model=LoadResponse, status_code=201)
-async def create_load(payload: LoadCreate, db: AsyncSession = Depends(get_db)):
+async def create_load(
+    payload: LoadCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     if payload.floor_rate < payload.target_rate:
         raise HTTPException(
             status_code=400,
@@ -24,7 +30,7 @@ async def create_load(payload: LoadCreate, db: AsyncSession = Depends(get_db)):
             status_code=400, detail="Delivery date must be after pickup date"
         )
 
-    load = Load(**payload.model_dump())
+    load = Load(**payload.model_dump(), user_id=current_user.id)
     db.add(load)
     await db.commit()
     await db.refresh(load)
@@ -35,8 +41,13 @@ async def create_load(payload: LoadCreate, db: AsyncSession = Depends(get_db)):
 async def list_loads(
     status: LoadStatus | None = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    query = select(Load).order_by(Load.created_at.desc())
+    query = (
+        select(Load)
+        .where(Load.user_id == current_user.id)
+        .order_by(Load.created_at.desc())
+    )
     if status:
         query = query.where(Load.status == status)
     result = await db.execute(query)
@@ -44,17 +55,20 @@ async def list_loads(
 
 
 @router.get("/{load_id}", response_model=LoadDetailResponse)
-async def get_load(load_id: str, db: AsyncSession = Depends(get_db)):
+async def get_load(
+    load_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     result = await db.execute(
         select(Load)
-        .where(Load.id == load_id)
+        .where(Load.id == load_id, Load.user_id == current_user.id)
         .options(selectinload(Load.booking))
     )
     load = result.scalar_one_or_none()
     if not load:
         raise HTTPException(status_code=404, detail="Load not found")
 
-    # Get the latest campaign with calls + carrier info
     campaign_result = await db.execute(
         select(Campaign)
         .where(Campaign.load_id == load_id)
@@ -65,10 +79,7 @@ async def get_load(load_id: str, db: AsyncSession = Depends(get_db)):
     campaign = campaign_result.scalar_one_or_none()
 
     return LoadDetailResponse(
-        **{
-            col.name: getattr(load, col.name)
-            for col in load.__table__.columns
-        },
+        **{col.name: getattr(load, col.name) for col in load.__table__.columns},
         campaign=campaign,
         booking=load.booking,
     )
@@ -76,9 +87,14 @@ async def get_load(load_id: str, db: AsyncSession = Depends(get_db)):
 
 @router.patch("/{load_id}", response_model=LoadResponse)
 async def update_load(
-    load_id: str, payload: LoadUpdate, db: AsyncSession = Depends(get_db)
+    load_id: str,
+    payload: LoadUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(Load).where(Load.id == load_id))
+    result = await db.execute(
+        select(Load).where(Load.id == load_id, Load.user_id == current_user.id)
+    )
     load = result.scalar_one_or_none()
     if not load:
         raise HTTPException(status_code=404, detail="Load not found")
@@ -93,8 +109,14 @@ async def update_load(
 
 
 @router.delete("/{load_id}", status_code=204)
-async def delete_load(load_id: str, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Load).where(Load.id == load_id))
+async def delete_load(
+    load_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Load).where(Load.id == load_id, Load.user_id == current_user.id)
+    )
     load = result.scalar_one_or_none()
     if not load:
         raise HTTPException(status_code=404, detail="Load not found")

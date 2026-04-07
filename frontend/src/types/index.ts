@@ -1,3 +1,17 @@
+export interface User {
+  id: string;
+  email: string;
+  full_name: string;
+  company_name: string;
+  created_at: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+}
+
 export type LoadStatus = "draft" | "outreach_in_progress" | "quotes_received" | "booked" | "completed" | "cancelled";
 export type CallStatus = "queued" | "ringing" | "in_progress" | "completed" | "failed" | "no_answer" | "voicemail";
 export type CampaignStatus = "pending" | "in_progress" | "completed" | "cancelled";

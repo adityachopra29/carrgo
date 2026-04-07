@@ -1,9 +1,18 @@
-"""Seed the database with sample carriers for development."""
+"""Seed the database with a default user and sample carriers for development."""
 
 import asyncio
 
+from app.auth import hash_password
 from app.database import async_session, init_db
 from app.models.carrier import Carrier
+from app.models.user import User
+
+DEV_USER = {
+    "email": "broker@carrgo.dev",
+    "password": "carrgo123",
+    "full_name": "Dev Broker",
+    "company_name": "Carrgo Demo Brokerage",
+}
 
 SAMPLE_CARRIERS = [
     {
@@ -167,18 +176,39 @@ async def seed():
     async with async_session() as db:
         from sqlalchemy import select, func
 
-        result = await db.execute(select(func.count(Carrier.id)))
+        # Create or retrieve dev user
+        result = await db.execute(select(User).where(User.email == DEV_USER["email"]))
+        user = result.scalar_one_or_none()
+
+        if not user:
+            user = User(
+                email=DEV_USER["email"],
+                hashed_password=hash_password(DEV_USER["password"]),
+                full_name=DEV_USER["full_name"],
+                company_name=DEV_USER["company_name"],
+            )
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+            print(f"Created dev user: {DEV_USER['email']} / {DEV_USER['password']}")
+        else:
+            print(f"Dev user already exists: {DEV_USER['email']}")
+
+        # Seed carriers if none exist for this user
+        result = await db.execute(
+            select(func.count(Carrier.id)).where(Carrier.user_id == user.id)
+        )
         count = result.scalar()
         if count and count > 0:
-            print(f"Database already has {count} carriers. Skipping seed.")
+            print(f"User already has {count} carriers. Skipping carrier seed.")
             return
 
         for data in SAMPLE_CARRIERS:
-            carrier = Carrier(**data)
+            carrier = Carrier(**data, user_id=user.id)
             db.add(carrier)
 
         await db.commit()
-        print(f"Seeded {len(SAMPLE_CARRIERS)} carriers.")
+        print(f"Seeded {len(SAMPLE_CARRIERS)} carriers for {DEV_USER['email']}.")
 
 
 if __name__ == "__main__":

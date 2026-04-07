@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24  # 24 hours
 
+    # Google OAuth
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = "http://localhost:3000/auth/callback"
+
     # Vapi — get these from https://dashboard.vapi.ai
     vapi_api_key: str = ""  # Required for real calls
     vapi_base_url: str = "https://api.vapi.ai"

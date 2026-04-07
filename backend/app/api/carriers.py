@@ -5,8 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import get_current_user
 from app.database import get_db
 from app.models.carrier import Carrier
+from app.models.user import User
 from app.schemas.carrier import CarrierCreate, CarrierResponse, CarrierUpdate
 
 router = APIRouter(prefix="/carriers", tags=["carriers"])
@@ -14,10 +16,15 @@ router = APIRouter(prefix="/carriers", tags=["carriers"])
 
 @router.post("", response_model=CarrierResponse, status_code=201)
 async def create_carrier(
-    payload: CarrierCreate, db: AsyncSession = Depends(get_db)
+    payload: CarrierCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     existing = await db.execute(
-        select(Carrier).where(Carrier.mc_number == payload.mc_number)
+        select(Carrier).where(
+            Carrier.mc_number == payload.mc_number,
+            Carrier.user_id == current_user.id,
+        )
     )
     if existing.scalar_one_or_none():
         raise HTTPException(
@@ -27,6 +34,7 @@ async def create_carrier(
     carrier = Carrier(
         **payload.model_dump(exclude={"lanes"}),
         lanes=[lane.model_dump() for lane in payload.lanes],
+        user_id=current_user.id,
     )
     db.add(carrier)
     await db.commit()
@@ -39,8 +47,13 @@ async def list_carriers(
     compliant_only: bool = False,
     equipment_type: str | None = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    query = select(Carrier).order_by(Carrier.name)
+    query = (
+        select(Carrier)
+        .where(Carrier.user_id == current_user.id)
+        .order_by(Carrier.name)
+    )
     if compliant_only:
         query = query.where(
             Carrier.is_compliant == True,  # noqa: E712
@@ -60,8 +73,16 @@ async def list_carriers(
 
 
 @router.get("/{carrier_id}", response_model=CarrierResponse)
-async def get_carrier(carrier_id: str, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Carrier).where(Carrier.id == carrier_id))
+async def get_carrier(
+    carrier_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Carrier).where(
+            Carrier.id == carrier_id, Carrier.user_id == current_user.id
+        )
+    )
     carrier = result.scalar_one_or_none()
     if not carrier:
         raise HTTPException(status_code=404, detail="Carrier not found")
@@ -73,8 +94,13 @@ async def update_carrier(
     carrier_id: str,
     payload: CarrierUpdate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(Carrier).where(Carrier.id == carrier_id))
+    result = await db.execute(
+        select(Carrier).where(
+            Carrier.id == carrier_id, Carrier.user_id == current_user.id
+        )
+    )
     carrier = result.scalar_one_or_none()
     if not carrier:
         raise HTTPException(status_code=404, detail="Carrier not found")
@@ -94,8 +120,16 @@ async def update_carrier(
 
 
 @router.delete("/{carrier_id}", status_code=204)
-async def delete_carrier(carrier_id: str, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Carrier).where(Carrier.id == carrier_id))
+async def delete_carrier(
+    carrier_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Carrier).where(
+            Carrier.id == carrier_id, Carrier.user_id == current_user.id
+        )
+    )
     carrier = result.scalar_one_or_none()
     if not carrier:
         raise HTTPException(status_code=404, detail="Carrier not found")
@@ -108,6 +142,7 @@ async def delete_carrier(carrier_id: str, db: AsyncSession = Depends(get_db)):
 async def import_carriers(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Bulk import carriers from a CSV file.
 
@@ -133,7 +168,10 @@ async def import_carriers(
                 continue
 
             existing = await db.execute(
-                select(Carrier).where(Carrier.mc_number == mc_number)
+                select(Carrier).where(
+                    Carrier.mc_number == mc_number,
+                    Carrier.user_id == current_user.id,
+                )
             )
             if existing.scalar_one_or_none():
                 skipped += 1
@@ -157,6 +195,7 @@ async def import_carriers(
                 is_compliant=True,
                 authority_active=True,
                 insurance_valid=True,
+                user_id=current_user.id,
             )
             db.add(carrier)
             created += 1

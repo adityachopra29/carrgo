@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, JSON, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, JSON, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -9,12 +9,15 @@ from app.database import Base
 
 class Carrier(Base):
     __tablename__ = "carriers"
+    __table_args__ = (
+        UniqueConstraint("mc_number", "user_id", name="uq_carrier_mc_user"),
+    )
 
     id: Mapped[str] = mapped_column(
         String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     name: Mapped[str] = mapped_column(String(255))
-    mc_number: Mapped[str] = mapped_column(String(20), unique=True)
+    mc_number: Mapped[str] = mapped_column(String(20))
     dot_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
     phone: Mapped[str] = mapped_column(String(20))
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -24,9 +27,13 @@ class Carrier(Base):
     authority_active: Mapped[bool] = mapped_column(Boolean, default=True)
     insurance_valid: Mapped[bool] = mapped_column(Boolean, default=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id"), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now()
     )
 
     # Relationships
+    owner = relationship("User", back_populates="carriers")
     calls = relationship("Call", back_populates="carrier", lazy="selectin")

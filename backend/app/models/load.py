@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Enum, Float, String, Text, func
+from sqlalchemy import Date, DateTime, Enum, Float, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -46,6 +46,9 @@ class Load(Base):
         Enum(LoadStatus), default=LoadStatus.DRAFT
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id"), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now()
     )
@@ -54,6 +57,7 @@ class Load(Base):
     )
 
     # Relationships
+    owner = relationship("User", back_populates="loads")
     campaigns = relationship("Campaign", back_populates="load", lazy="selectin")
     booking = relationship(
         "Booking", back_populates="load", uselist=False, lazy="selectin"

@@ -5,11 +5,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.auth import get_current_user
 from app.database import get_db
 from app.models.booking import Booking
 from app.models.call import Call, CallStatus
 from app.models.campaign import Campaign
 from app.models.load import Load, LoadStatus
+from app.models.user import User
 from app.schemas.booking import BookingCreate, BookingResponse
 from app.schemas.call import CallResponse
 from app.schemas.campaign import CampaignResponse, OutreachRequest
@@ -74,16 +76,26 @@ def _serialize_campaign(campaign: Campaign, include_carrier: bool = False) -> Ca
     )
 
 
+async def _get_owned_load(
+    load_id: str, current_user: User, db: AsyncSession
+) -> Load:
+    result = await db.execute(
+        select(Load).where(Load.id == load_id, Load.user_id == current_user.id)
+    )
+    load = result.scalar_one_or_none()
+    if not load:
+        raise HTTPException(status_code=404, detail="Load not found")
+    return load
+
+
 @router.post("/outreach", response_model=CampaignResponse, status_code=201)
 async def start_load_outreach(
     load_id: str,
     payload: OutreachRequest = OutreachRequest(),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(Load).where(Load.id == load_id))
-    load = result.scalar_one_or_none()
-    if not load:
-        raise HTTPException(status_code=404, detail="Load not found")
+    load = await _get_owned_load(load_id, current_user, db)
 
     try:
         campaign = await start_outreach(
@@ -99,8 +111,12 @@ async def start_load_outreach(
 
 @router.get("/campaign", response_model=CampaignResponse | None)
 async def get_load_campaign(
-    load_id: str, db: AsyncSession = Depends(get_db)
+    load_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    await _get_owned_load(load_id, current_user, db)
+
     query = (
         select(Campaign)
         .where(Campaign.load_id == load_id)
@@ -119,11 +135,10 @@ async def book_load(
     load_id: str,
     payload: BookingCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(Load).where(Load.id == load_id))
-    load = result.scalar_one_or_none()
-    if not load:
-        raise HTTPException(status_code=404, detail="Load not found")
+    load = await _get_owned_load(load_id, current_user, db)
+
     if load.status not in (LoadStatus.QUOTES_RECEIVED, LoadStatus.OUTREACH_IN_PROGRESS):
         raise HTTPException(
             status_code=400,

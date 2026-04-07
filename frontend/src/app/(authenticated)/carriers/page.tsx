@@ -20,7 +20,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { apiClient } from "@/lib/api";
+import { apiClient, getApiBaseUrl } from "@/lib/api";
 import { toast } from "sonner";
 import type { Carrier, EquipmentType } from "@/types";
 import { EQUIPMENT_LABELS } from "@/types";
@@ -104,10 +104,12 @@ export default function CarriersPage() {
       const uploadForm = new FormData();
       uploadForm.append("file", file);
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/carriers/import`,
-        { method: "POST", body: uploadForm }
-      );
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${getApiBaseUrl()}/api/carriers/import`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: uploadForm,
+      });
       const result = await response.json();
 
       if (!response.ok) throw new Error(result.detail);
