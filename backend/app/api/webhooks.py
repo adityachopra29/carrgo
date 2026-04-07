@@ -156,20 +156,31 @@ async def _process_webhook(body: dict, db: AsyncSession):
             available = params.get("available", False)
             notes = params.get("notes", "")
 
-            if available and quoted_rate and float(quoted_rate) > 0:
-                call.quoted_rate = float(quoted_rate)
-                if notes:
-                    call.transcript = (call.transcript or "") + f"\n[Notes: {notes}]"
-                await db.commit()
+            # Update quote if a valid rate is provided (allows re-negotiation/updates)
+            try:
+                rate_value = float(quoted_rate) if quoted_rate else None
+                if rate_value is not None and rate_value >= 0:
+                    call.quoted_rate = rate_value
+                    await db.commit()
 
-                await event_manager.publish_quote(
-                    load_id,
-                    {
-                        "call_id": call.id,
-                        "carrier_id": call.carrier_id,
-                        "quoted_rate": call.quoted_rate,
-                    },
-                )
+                    # Always publish quote update (even if rate changed from previous submission)
+                    await event_manager.publish_quote(
+                        load_id,
+                        {
+                            "call_id": call.id,
+                            "carrier_id": call.carrier_id,
+                            "quoted_rate": call.quoted_rate,
+                        },
+                    )
+            except (ValueError, TypeError):
+                pass  # Invalid rate format, skip update
+
+            if notes:
+                if call.transcript:
+                    call.transcript += f"\n[Notes: {notes}]"
+                else:
+                    call.transcript = f"[Notes: {notes}]"
+                await db.commit()
 
             # Return result to Vapi — v2 expects results array, v1 expects result string
             result_text = "Quote recorded successfully. Thank the carrier and end the call."

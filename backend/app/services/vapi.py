@@ -20,7 +20,7 @@ Be professional, concise, and friendly. You are calling on behalf of a freight b
 SHIPMENT DETAILS:
 - Origin: {origin}
 - Destination: {destination}
-- Pickup Date: {pickup_date}
+- Pickup Date: {pickup_date_readable}
 - Equipment Needed: {equipment_type}
 - Weight: {weight} lbs
 - Commodity: {commodity}
@@ -33,11 +33,12 @@ NEGOTIATION INSTRUCTIONS:
 - If their rate is at or below ${target_rate:.0f}, accept it enthusiastically
 - If their rate is between ${target_rate:.0f} and ${floor_rate:.0f}, counter-offer with ${target_rate:.0f} and try to meet in the middle
 - If their rate is above ${floor_rate:.0f}, politely say it's above your budget and thank them
-- When you have their final rate and availability, call the submit_quote function
+- When you have their final rate and availability, call the submit_quote function with the results
+- After calling submit_quote, thank them and end the call by saying "Thanks, goodbye!" and disconnecting
 - Keep the conversation under 2 minutes
-- If you reach voicemail, hang up
+- If you reach voicemail, hang up immediately
 
-IMPORTANT: Always call the submit_quote function before ending the call with the carrier's response."""
+CRITICAL: You MUST call the submit_quote function with the carrier's response. After submit_quote succeeds, end the call."""
 
 SUBMIT_QUOTE_FUNCTION = {
     "name": "submit_quote",
@@ -59,6 +60,21 @@ SUBMIT_QUOTE_FUNCTION = {
             },
         },
         "required": ["quoted_rate", "available"],
+    },
+}
+
+END_CALL_FUNCTION = {
+    "name": "end_call",
+    "description": "End the call with the carrier. Call this after submit_quote to disconnect.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "reason": {
+                "type": "string",
+                "description": "Brief reason for ending the call (e.g., 'Rate submitted and accepted', 'Rate too high')",
+            },
+        },
+        "required": ["reason"],
     },
 }
 
@@ -99,7 +115,17 @@ class VapiService:
         Returns:
             Vapi call response with call ID and status
         """
-        prompt = ASSISTANT_PROMPT.format(**load_details)
+        # Format pickup_date for natural speech (e.g., "April 8, 2026" instead of "2026-04-08")
+        load_details_with_readable_date = load_details.copy()
+        try:
+            from datetime import datetime as dt
+            pickup_date_obj = dt.strptime(load_details["pickup_date"], "%Y-%m-%d")
+            load_details_with_readable_date["pickup_date_readable"] = pickup_date_obj.strftime("%B %d, %Y")
+        except (ValueError, KeyError):
+            # Fallback if date format is unexpected
+            load_details_with_readable_date["pickup_date_readable"] = load_details.get("pickup_date", "TBD")
+
+        prompt = ASSISTANT_PROMPT.format(**load_details_with_readable_date)
 
         webhook_url = f"{settings.webhook_base_url}/api/webhooks/vapi"
 
@@ -109,7 +135,7 @@ class VapiService:
                     "provider": settings.voice_model_provider,
                     "model": settings.voice_model,
                     "messages": [{"role": "system", "content": prompt}],
-                    "functions": [SUBMIT_QUOTE_FUNCTION],
+                    "functions": [SUBMIT_QUOTE_FUNCTION, END_CALL_FUNCTION],
                 },
                 "voice": {
                     "provider": settings.voice_provider,
@@ -119,7 +145,7 @@ class VapiService:
                     f"Hi, this is calling from our freight brokerage. "
                     f"I have a load going from {load_details['origin']} to "
                     f"{load_details['destination']}, picking up "
-                    f"{load_details['pickup_date']}. "
+                    f"{load_details_with_readable_date['pickup_date_readable']}. "
                     f"Do you have any availability on that lane?"
                 ),
                 "endCallFunctionEnabled": True,
