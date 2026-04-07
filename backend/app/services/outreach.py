@@ -120,63 +120,91 @@ async def _dispatch_calls(
     load_details: dict,
     webhook_base_url: str,
 ):
-    """Dispatch all calls sequentially via Vapi (or simulation).
+    """Dispatch all calls concurrently via Vapi (or simulation).
 
-    Uses a fresh DB session to avoid concurrent access issues.
-    Calls are dispatched one-by-one (the actual phone calls happen
-    concurrently on Vapi's side — we're just sending API requests).
+    Each call runs in its own DB session concurrently via asyncio.gather.
     """
+    webhook_url = f"{webhook_base_url}/api/webhooks/vapi"
+
+    await asyncio.gather(
+        *[
+            _dispatch_single_call(
+                load_id, campaign_id, call_id, carrier_id, load_details, webhook_url
+            )
+            for call_id, carrier_id in call_carrier_ids
+        ],
+        return_exceptions=True,
+    )
+
+
+async def _dispatch_single_call(
+    load_id: str,
+    campaign_id: str,
+    call_id: str,
+    carrier_id: str,
+    load_details: dict,
+    webhook_url: str,
+):
+    """Dispatch a single call in its own DB session."""
     from app.database import get_session_factory
 
     async_session = get_session_factory()
 
-    webhook_url = f"{webhook_base_url}/api/webhooks/vapi"
+    async with async_session() as db:
+        try:
+            call = await db.get(Call, call_id)
+            carrier = await db.get(Carrier, carrier_id)
+            campaign = await db.get(Campaign, campaign_id)
+            load = await db.get(Load, load_id)
 
-    for call_id, carrier_id in call_carrier_ids:
-        async with async_session() as db:
-            try:
-                call = await db.get(Call, call_id)
-                carrier = await db.get(Carrier, carrier_id)
-                campaign = await db.get(Campaign, campaign_id)
-                load = await db.get(Load, load_id)
+            if not call or not carrier or not campaign or not load:
+                return
 
-                if not call or not carrier or not campaign or not load:
-                    continue
+            result = await vapi_service.create_call(
+                phone_number=carrier.phone,
+                load_details=load_details,
+                webhook_url=webhook_url,
+            )
 
-                result = await vapi_service.create_call(
-                    phone_number=carrier.phone,
-                    load_details=load_details,
-                    webhook_url=webhook_url,
+            call.vapi_call_id = result.get("id")
+            call.status = CallStatus.RINGING
+            call.started_at = datetime.utcnow()
+
+            if result.get("simulated"):
+                await _simulate_call_lifecycle(db, load, campaign, call, carrier)
+            else:
+                await db.commit()
+                await event_manager.publish_call_update(
+                    load_id,
+                    {
+                        "call_id": call.id,
+                        "carrier_name": carrier.name,
+                        "status": call.status.value,
+                    },
                 )
 
-                call.vapi_call_id = result.get("id")
-                call.status = CallStatus.RINGING
-                call.started_at = datetime.utcnow()
-
-                if result.get("simulated"):
-                    await _simulate_call_lifecycle(
-                        db, load, campaign, call, carrier
-                    )
-                else:
-                    await db.commit()
-                    await event_manager.publish_call_update(
-                        load_id,
-                        {
-                            "call_id": call.id,
-                            "carrier_name": carrier.name,
-                            "status": call.status.value,
-                        },
-                    )
-
-            except Exception as e:
-                logger.error(f"Failed to dispatch call {call_id}: {e}")
-                try:
-                    call = await db.get(Call, call_id)
+        except Exception as e:
+            logger.error(f"Failed to dispatch call {call_id}: {e}")
+            try:
+                async with async_session() as err_db:
+                    call = await err_db.get(Call, call_id)
                     if call:
                         call.status = CallStatus.FAILED
-                        await db.commit()
-                except Exception:
-                    pass
+                        call.ended_at = datetime.utcnow()
+                        await err_db.commit()
+                        await event_manager.publish_call_update(
+                            load_id,
+                            {
+                                "call_id": call.id,
+                                "status": "failed",
+                            },
+                        )
+                        campaign = await err_db.get(Campaign, campaign_id)
+                        load = await err_db.get(Load, load_id)
+                        if campaign and load:
+                            await _handle_call_completion(err_db, load, campaign)
+            except Exception:
+                pass
 
 
 async def _simulate_call_lifecycle(
