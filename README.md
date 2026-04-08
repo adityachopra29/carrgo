@@ -21,9 +21,9 @@ Carrgo automates the most time-consuming part of freight brokering: calling carr
 - [x]**Real-time Dashboard** — quotes and call statuses update live via Server-Sent Events (no refresh needed)
 - [x]**Carrier Management** — add carriers manually or bulk import via CSV
 - [x]**Compliance Filtering** — only calls carriers marked as compliant, authority active, and insurance valid
-- [] **Live Rate Negotiation** — GPT-4o mini powered agents negotiate from your target rate up to your floor rate
-- []**Full Call Transcripts** — every call is logged with transcript and duration
-- [] **Parallel AI Calling** — calls up to 10 carriers simultaneously via Vapi.ai
+- [x] **Live Rate Negotiation** — GPT-4o mini powered agents negotiate from your target rate up to your floor rate
+- [x]**Full Call Transcripts** — every call is logged with transcript and duration
+- [x] **Parallel AI Calling** — calls up to 10 carriers simultaneously via Vapi.ai
 
 
 ---
