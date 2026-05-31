@@ -27,4 +27,4 @@ pytest-asyncio==0.24.0
 httpx  # also used for TestClient
 
 # Notifications
-twilio==9.2.5
+twilio==9.2.4
