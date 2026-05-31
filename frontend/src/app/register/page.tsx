@@ -56,7 +56,7 @@ export default function RegisterPage() {
         email: form.email,
         password: form.password,
       });
-      router.push("/");
+      router.push("/dashboard");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Registration failed");
     } finally {

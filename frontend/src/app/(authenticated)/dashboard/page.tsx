@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
-import type { Load, LoadStatus } from "@/types";
+import type { Load } from "@/types";
 import { STATUS_LABELS } from "@/types";
 
 function getStatusVariant(

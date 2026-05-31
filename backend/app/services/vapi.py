@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 # Vapi assistant prompt template for freight negotiation
 ASSISTANT_PROMPT = """You are a freight broker representative calling a trucking carrier to check availability and negotiate a rate for a shipment.
 
-Be professional, concise, and friendly. You are calling on behalf of a freight brokerage.
+Be professional, concise, and friendly. You are calling on behalf of {broker_company}.
 
 SHIPMENT DETAILS:
 - Origin: {origin}
@@ -142,7 +142,7 @@ class VapiService:
                     "voiceId": settings.voice_id,
                 },
                 "firstMessage": (
-                    f"Hi, this is calling from our freight brokerage. "
+                    f"Hi, this is calling from {load_details.get('broker_company', 'our freight brokerage')}. "
                     f"I have a load going from {load_details['origin']} to "
                     f"{load_details['destination']}, picking up "
                     f"{load_details_with_readable_date['pickup_date_readable']}. "

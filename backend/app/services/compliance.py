@@ -14,6 +14,7 @@ from app.models.load import EquipmentType
 async def get_compliant_carriers(
     db: AsyncSession,
     equipment_type: EquipmentType,
+    user_id: str,
     origin_state: str | None = None,
     destination_state: str | None = None,
     limit: int = 10,
@@ -21,13 +22,15 @@ async def get_compliant_carriers(
     """Find carriers that are compliant and match the load requirements.
 
     Filters:
-    1. is_compliant = True
-    2. authority_active = True
-    3. insurance_valid = True
-    4. Equipment type matches (carrier supports the required equipment)
-    5. Optionally filter by lane preference (origin/destination state)
+    1. user_id matches (only the broker's own carriers)
+    2. is_compliant = True
+    3. authority_active = True
+    4. insurance_valid = True
+    5. Equipment type matches (carrier supports the required equipment)
+    6. Optionally filter by lane preference (origin/destination state)
     """
     query = select(Carrier).where(
+        Carrier.user_id == user_id,
         Carrier.is_compliant == True,  # noqa: E712
         Carrier.authority_active == True,  # noqa: E712
         Carrier.insurance_valid == True,  # noqa: E712

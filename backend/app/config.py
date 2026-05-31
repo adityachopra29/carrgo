@@ -14,10 +14,17 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24  # 24 hours
 
+    # CORS — comma-separated frontend origins
+    cors_origins: str = "http://localhost:3000"
+
     # Google OAuth
     google_client_id: str = ""
     google_client_secret: str = ""
     google_redirect_uri: str = "http://localhost:3000/auth/callback"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     # Twilio (SMS + WhatsApp)
     twilio_account_sid: str = ""

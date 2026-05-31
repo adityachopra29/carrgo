@@ -175,18 +175,42 @@ async def book_load(
     await db.commit()
     await db.refresh(booking)
 
-    # Fetch carrier for notification
+    # Fetch carrier for notification and refresh load so attributes survive session close
+    await db.refresh(load)
     carrier_result = await db.execute(select(Carrier).where(Carrier.id == call.carrier_id))
     carrier = carrier_result.scalar_one_or_none()
     if carrier:
-        asyncio.create_task(
-            notify_carrier_booked(
-                carrier_phone=carrier.phone,
-                carrier_email=carrier.email,
-                carrier_name=carrier.name,
-                load=load,
-                agreed_rate=booking.agreed_rate,
+        # Snapshot plain values — ORM objects detach when session closes
+        carrier_phone = carrier.phone
+        carrier_email = carrier.email
+        carrier_name = carrier.name
+        agreed_rate = booking.agreed_rate
+        load_origin = load.origin
+        load_destination = load.destination
+        load_pickup_date = load.pickup_date
+        load_delivery_date = load.delivery_date
+        load_equipment_type = load.equipment_type
+        load_weight = load.weight
+        load_commodity = load.commodity
+
+        async def _notify():
+            class _LoadSnapshot:
+                origin = load_origin
+                destination = load_destination
+                pickup_date = load_pickup_date
+                delivery_date = load_delivery_date
+                equipment_type = load_equipment_type
+                weight = load_weight
+                commodity = load_commodity
+
+            await notify_carrier_booked(
+                carrier_phone=carrier_phone,
+                carrier_email=carrier_email,
+                carrier_name=carrier_name,
+                load=_LoadSnapshot(),
+                agreed_rate=agreed_rate,
             )
-        )
+
+        asyncio.create_task(_notify())
 
     return booking

@@ -42,7 +42,7 @@ function CallbackHandler() {
       .then(() => {
         sessionStorage.removeItem("google_oauth_state");
         sessionStorage.removeItem(processingKey);
-        router.replace("/");
+        router.replace("/dashboard");
       })
       .catch((err: unknown) => {
         sessionStorage.removeItem("google_oauth_state");

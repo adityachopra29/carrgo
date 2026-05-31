@@ -21,6 +21,7 @@ from app.models.call import Call, CallStatus
 from app.models.campaign import Campaign, CampaignStatus
 from app.models.carrier import Carrier
 from app.models.load import Load, LoadStatus
+from app.models.user import User
 from app.services.compliance import get_compliant_carriers
 from app.services.events import event_manager
 from app.services.vapi import vapi_service
@@ -48,10 +49,11 @@ async def start_outreach(
 
     max_calls = max_calls or settings.max_parallel_calls
 
-    # Find matching compliant carriers
+    # Find matching compliant carriers (scoped to this broker's carriers)
     carriers = await get_compliant_carriers(
         db=db,
         equipment_type=load.equipment_type,
+        user_id=load.user_id,
         limit=max_calls,
     )
 
@@ -92,6 +94,10 @@ async def start_outreach(
     call_carrier_ids = [(call.id, carrier.id) for call, carrier in calls]
     campaign_id = campaign.id
     load_id = load.id
+
+    user = await db.get(User, load.user_id)
+    broker_company = user.company_name if user else "our freight brokerage"
+
     load_snapshot = {
         "origin": load.origin,
         "destination": load.destination,
@@ -101,6 +107,7 @@ async def start_outreach(
         "commodity": load.commodity,
         "target_rate": load.target_rate,
         "floor_rate": load.floor_rate,
+        "broker_company": broker_company,
     }
 
     # Dispatch calls concurrently in background with fresh sessions

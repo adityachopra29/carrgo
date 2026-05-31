@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
-  { href: "/", label: "Dashboard", icon: "📊" },
+  { href: "/dashboard", label: "Dashboard", icon: "📊" },
   { href: "/loads", label: "Loads", icon: "📦" },
   { href: "/carriers", label: "Carriers", icon: "🚛" },
 ];
@@ -19,7 +19,7 @@ export function Sidebar() {
 
   function handleLogout() {
     logout();
-    router.push("/login");
+    router.push("/");
   }
 
   return (
@@ -29,10 +29,7 @@ export function Sidebar() {
       </div>
       <nav className="space-y-1 flex-1">
         {navItems.map((item) => {
-          const isActive =
-            item.href === "/"
-              ? pathname === "/"
-              : pathname.startsWith(item.href);
+          const isActive = pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}

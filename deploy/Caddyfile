@@ -1,0 +1,11 @@
+{
+	email you@adityachopra.tech
+}
+
+carrgo.adityachopra.tech {
+	reverse_proxy frontend:3000
+}
+
+api.carrgo.adityachopra.tech {
+	reverse_proxy backend:8000
+}

@@ -1,0 +1,38 @@
+# Render Blueprint — deploy backend at https://dashboard.render.com
+# New → Blueprint → connect this repo → apply
+
+services:
+  - type: web
+    name: carrgo-api
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: sh docker-entrypoint.sh
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.0"
+      - key: DEBUG
+        value: "false"
+      - key: RUN_SEED
+        value: "false"
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:///./data/carrgo.db
+      - key: CORS_ORIGINS
+        value: https://carrgo.adityachopra.tech
+      - key: WEBHOOK_BASE_URL
+        value: https://api.carrgo.adityachopra.tech
+      - key: GOOGLE_REDIRECT_URI
+        value: https://carrgo.adityachopra.tech/auth/callback
+      - key: SECRET_KEY
+        generateValue: true
+      - key: VAPI_API_KEY
+        sync: false
+      - key: VAPI_PHONE_NUMBER_ID
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
